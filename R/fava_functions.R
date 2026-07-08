@@ -205,11 +205,7 @@ het_mean <- function(relab_matrix,
                      S = NULL,
                      w = NULL,
                      time = NULL,
-                     group = NULL
-                     # K = ncol(relab_matrix),
-                     # w = rep(1/nrow(relab_matrix), nrow(relab_matrix)),
-                     # S = diag(ncol(relab_matrix))
-) {
+                     group = NULL) {
   process_out <- process_relab(relab_matrix = relab_matrix, K = K, S = S, w = w, time = time, group = group)
 
   K <- process_out$K
@@ -252,23 +248,6 @@ het_mean <- function(relab_matrix,
     }
     return(gs_df)
   }
-
-  # OLD VERSION BELOW
-  # # K, S, w, time, and group are optional arguments
-  #
-  # # S = as.matrix(S)
-  # I = nrow(relab_matrix)
-  # # S_checker(S = S, K = K)
-  #
-  #
-  # if(!missing(w) && length(w) != nrow(relab_matrix)){
-  #   stop("Length of w must equal number of rows of relab_matrix.")
-  # }
-  #
-  # relab_matrix = relab_matrix[,(ncol(relab_matrix)-K+1):ncol(relab_matrix)]
-  #
-  # # Average Gini-Simpson index of each of the I subpopulations
-  # sum(w *sapply(1:I, function(i){ het(q = unlist(relab_matrix[i,]), S = S) }))
 }
 
 # het_pooled -----------------------------------------------------------------
@@ -377,31 +356,6 @@ het_pooled <- function(relab_matrix,
     }
     return(gs_df)
   }
-
-  # OLD VERSION BELOW
-  # # w and S are optional arguments
-  #
-  # I = nrow(relab_matrix)
-  #
-  # # S = as.matrix(S)
-  # # S_checker(S = S, K = K)
-  #
-  # if(missing(S)){
-  #   S = diag(K)
-  # }
-  #
-  # if(missing(w)){
-  #   w = rep(1, I)/I
-  # }
-  #
-  #
-  # if(!missing(w) && length(w) != nrow(relab_matrix)){
-  #   stop("Length of w must equal number of rows of relab_matrix.")
-  # }
-  #
-  # relab_matrix = relab_matrix[,(ncol(relab_matrix)-K+1):ncol(relab_matrix)]
-  #
-  # het(q = colSums(sweep(x = relab_matrix, MARGIN = 1, w, `*`)), S = S)
 }
 
 
