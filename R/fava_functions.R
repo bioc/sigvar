@@ -43,7 +43,8 @@ process_relab <- function(relab_matrix,
 
     if (any(table(relab_matrix$grouping_var_multiple) < 2)) {
       ignore <- names(which(table(relab_matrix$grouping_var_multiple) < 2))
-      warning("Only analyzing combinations of grouping variables with at least two samples. Ignoring the following combinations of grouping variables: ", paste(ignore, collapse = "  "))
+      ignore_formatted <- paste(ignore, collapse = "  ")
+      warning("Only analyzing combinations of grouping variables with at least two samples. Ignoring the following combinations of grouping variables: ", ignore_formatted)
       relab_matrix <- dplyr::filter(
         relab_matrix,
         grouping_var_multiple %in%
@@ -59,7 +60,11 @@ process_relab <- function(relab_matrix,
   if (length(group) == 1) {
     if (any(table(relab_matrix[[group]]) < 2)) {
       ignore <- names(which(table(relab_matrix[[group]]) < 2))
-      warning("Only analyzing groups with at least two samples. Ignoring the following groups: ", paste(ignore, collapse = "  "))
+      ignore_formatted <- paste(ignore, collapse = "  ")
+      warning(
+        "Only analyzing groups with at least two samples. Ignoring the following groups: ",
+        ignore_formatted
+      )
       relab_matrix <- relab_matrix[relab_matrix[[group]] %in% names(which(table(relab_matrix[[group]]) >= 2)), ]
     }
   }
@@ -172,7 +177,7 @@ het <- function(q, K = length(q), S = diag(K)) {
 #' q4 <- c(0, 0, 1, 0)
 #'
 #' # we could compute the mean manually:
-#' mean(sapply(list(q1, q2, q3, q4), het))
+#' mean(vapply(X = list(q1, q2, q3, q4), FUN = het, FUN.VALUE = numeric(1)))
 #'
 #' # Or we could use het_mean:
 #' relative_abundances <- matrix(c(q1, q2, q3, q4),
@@ -220,7 +225,7 @@ het_mean <- function(relab_matrix,
   relab_grouping_vars <- process_out$relab_grouping_vars
 
   if (is.null(group)) {
-    het_mean_fast(relab_matrix_clean$relab_matrix, K, w, S)
+    het_mean_fast(relab_matrix_clean$relab_matrix, w, S)
   } else {
     gs_list <- c()
     for (subgroup in unique(relab_matrix_clean$group)) {
@@ -236,12 +241,11 @@ het_mean <- function(relab_matrix,
 
       gs_list <- c(
         gs_list,
-        het_mean_fast(relab_sub, K, w_sub, S)
+        het_mean_fast(relab_sub, w_sub, S)
       )
     }
     gs_df <- data.frame(unique(relab_matrix_clean$group), gs_list)
     colnames(gs_df) <- c(group, "het_mean")
-    # names(gs_list) = unique(relab_matrix_clean$group)
 
     if (multiple_groups) {
       gs_df <- dplyr::left_join(dplyr::distinct(relab_grouping_vars), gs_df)
@@ -309,11 +313,7 @@ het_pooled <- function(relab_matrix,
                        S = NULL,
                        w = NULL,
                        time = NULL,
-                       group = NULL
-                       # K = ncol(relab_matrix),
-                       # w = rep(1/nrow(relab_matrix), nrow(relab_matrix)),
-                       # S = diag(ncol(relab_matrix))
-) {
+                       group = NULL) {
   process_out <- process_relab(relab_matrix = relab_matrix, K = K, S = S, w = w, time = time, group = group)
 
   K <- process_out$K
@@ -328,7 +328,7 @@ het_pooled <- function(relab_matrix,
   relab_grouping_vars <- process_out$relab_grouping_vars
 
   if (is.null(group)) {
-    het_pooled_fast(relab_matrix_clean$relab_matrix, K, w, S)
+    het_pooled_fast(relab_matrix_clean$relab_matrix, w, S)
   } else {
     gs_list <- c()
     for (subgroup in unique(relab_matrix_clean$group)) {
@@ -344,12 +344,11 @@ het_pooled <- function(relab_matrix,
 
       gs_list <- c(
         gs_list,
-        het_pooled_fast(relab_sub, K, w_sub, S)
+        het_pooled_fast(relab_sub, w_sub, S)
       )
     }
     gs_df <- data.frame(unique(relab_matrix_clean$group), gs_list)
     colnames(gs_df) <- c(group, "het_pooled")
-    # names(gs_list) = unique(relab_matrix_clean$group)
 
     if (multiple_groups) {
       gs_df <- dplyr::left_join(dplyr::distinct(relab_grouping_vars), gs_df)
@@ -481,7 +480,9 @@ time_weights <- function(times, group = NULL) {
     if (I < 2) {
       stop("times must have length greater than 1.")
     }
-    if (any(sapply(2:I, function(i) times[i] - times[i - 1]) <= 0)) {
+    if (any(vapply(X = 2:I, FUN = function(i) {
+      times[i] - times[i - 1]
+    }, FUN.VALUE = numeric(1)) <= 0)) {
       stop("times must be increasing. Each entry must be greater than the previous entry.")
     }
 
@@ -502,7 +503,12 @@ time_weights <- function(times, group = NULL) {
       if (I < 2) {
         stop("Within each group, times must have length greater than 1.")
       }
-      if (any(sapply(2:I, function(i) time_name[i] - time_name[i - 1]) <= 0)) {
+      if (any(vapply(
+        X = 2:I, FUN = function(i) {
+          time_name[i] - time_name[i - 1]
+        },
+        FUN.VALUE = numeric(1)
+      ) <= 0)) {
         stop("Within each group, times must be increasing. Each entry must be greater than the previous entry.")
       }
 
@@ -574,7 +580,7 @@ fst <- function(relab_matrix,
                 time = NULL,
                 group = NULL,
                 normalized = FALSE) {
-  if (normalized == TRUE && any(!sapply(list(time, w, S), is.null))) {
+  if (normalized == TRUE && any(!vapply(X = list(time, w, S), FUN = is.null, FUN.VALUE = logical(1)))) {
     stop("Fst can be either normalized or weighted, but not both. Please specify `normalized = TRUE` if you wish to compute normalized Fst OR provide the weighting parameters w and/or S.")
   }
 
@@ -596,9 +602,9 @@ fst <- function(relab_matrix,
     if (normalized) {
       fst_norm(relab_matrix = relab_matrix_clean$relab_matrix)
     } else {
-      (het_pooled_fast(relab_matrix_clean$relab_matrix, K, w, S) -
-        het_mean_fast(relab_matrix_clean$relab_matrix, K, w, S)) /
-        het_pooled_fast(relab_matrix_clean$relab_matrix, K, w, S)
+      (het_pooled_fast(relab_matrix_clean$relab_matrix, w, S) -
+        het_mean_fast(relab_matrix_clean$relab_matrix, w, S)) /
+        het_pooled_fast(relab_matrix_clean$relab_matrix, w, S)
     }
   } else {
     fst_list <- c()
@@ -617,9 +623,9 @@ fst <- function(relab_matrix,
         fst_list,
         ifelse(normalized,
           fst_norm(relab_matrix = relab_sub),
-          (het_pooled_fast(relab_sub, K, w_sub, S) -
-            het_mean_fast(relab_sub, K, w_sub, S)) /
-            het_pooled_fast(relab_sub, K, w_sub, S)
+          (het_pooled_fast(relab_sub, w_sub, S) -
+            het_mean_fast(relab_sub, w_sub, S)) /
+            het_pooled_fast(relab_sub, w_sub, S)
         )
       )
     }
@@ -636,27 +642,24 @@ fst <- function(relab_matrix,
 
 
 # fast versions of functions to use in fst function:
-het_fast <- function(q, S = diag(length(q)), K = length(q)) {
+het_fast <- function(q, S = diag(length(q))) {
   1 - sum(q * c(S %*% q))
 }
-
+ 
 het_mean_fast <- function(relab_matrix,
-                          K = ncol(relab_matrix),
                           w = rep(1 / nrow(relab_matrix), nrow(relab_matrix)),
                           S = diag(ncol(relab_matrix))) {
   I <- nrow(relab_matrix)
 
   # Average Gini-Simpson index of each of the I subpopulations
-  sum(w * sapply(1:I, function(i) {
+  sum(w * vapply(X = seq_len(I), FUN = function(i) {
     het_fast(q = unlist(relab_matrix[i, ]), S = S)
-  }))
+  }, FUN.VALUE = numeric(1)))
 }
 
 het_pooled_fast <- function(relab_matrix,
-                            K = ncol(relab_matrix),
                             w = rep(1 / nrow(relab_matrix), nrow(relab_matrix)),
                             S = diag(ncol(relab_matrix))) {
-  I <- nrow(relab_matrix)
 
   het_fast(q = colSums(sweep(x = relab_matrix, MARGIN = 1, w, `*`)), S = S)
 }

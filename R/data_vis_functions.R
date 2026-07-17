@@ -21,28 +21,28 @@ Q_checker <- function(Q, K, rep) {
   # convert Q matrix entries to numbers
   Q <- data.matrix(Q)
 
-  # Name Q matrix columns q1, q2, ..., qK
-  # colnames(Q) <- paste0("q",1:K)
-
   # Check if Q matrix has any missing values, and give warning if necessary
   if (any(is.na(Q))) {
     # Identify location of missing entries
-    na.pos <- sapply(
-      which(is.na(Q)),
-      function(index) c(index %% nrow(Q), ceiling(index / nrow(Q)))
+    na.pos <- vapply(
+      X = which(is.na(Q)),
+      FUN = function(index) {
+        c(index %% nrow(Q), ceiling(index / nrow(Q)))
+      },
+      FUN.VALUE = numeric(2)
     ) %>%
       t()
     # Format missing entries as a string
     na.pos.format <- list()
-    for (row in 1:nrow(na.pos)) {
+    for (row in seq_len(nrow(na.pos))) {
       na.pos.format[row] <- paste0("(", na.pos[row, 1], ", ", na.pos[row, 2], ")")
     }
     na.pos.format.string <- as.character(na.pos.format) %>% paste(collapse = ", ")
 
-    stop(paste0(
+    stop(
       "There is at least one NA value in your signature activity matrix. The missing entries are found in the following positions: ",
       na.pos.format.string
-    ))
+    )
   }
 
   # check if matrix rows sum to 1, and give useful warnings if rounding is necessary
@@ -51,10 +51,10 @@ Q_checker <- function(Q, K, rep) {
     if (missing(rep)) {
       warning("At least one signature activity matrix has rows which do not sum to exactly 1. Rounding the sum of each row to 1 by dividing all entries by the sum of the row.")
     } else {
-      warning(paste0(
+      warning(
         "At least one of the rows of signature activity matrix number ", rep,
         " (restricted to the last K columns) does not sum to 1. Rounding the sum of each row to 1 by dividing all entries by the sum of the row."
-      ))
+      )
     }
     # Normalize each row of the matrix by dividing by the rowsums
     Q <- Q / sums
@@ -175,6 +175,30 @@ Q_checker <- function(Q, K, rep) {
 #' @importFrom rlang .data
 #' @export
 plot_signature_prop <- function(relab_matrix, group = NULL, time = NULL, w = NULL, K = NULL, arrange = FALSE) {
+  if (!is.null(group)) {
+    if (!(is.character(group))) {
+      stop("group must be a character string or vector of strings specifying the name(s) of the grouping column.")
+    }
+  }
+  if (!is.null(time)) {
+    if (!(is.character(time) && length(time) == 1)) {
+      stop("time must be a character string specifying the name of the time column.")
+    }
+  }
+  if (!is.null(w)) {
+    if (!(is.numeric(w) && length(w) > 1 && (round(sum(w), 6) == 1))) {
+      stop("w must be a numeric vector that sums to 1.")
+    }
+  }
+  if (!is.null(K)) {
+    if (!(is.numeric(K) && length(K) == 1 && (round(K) == K))) {
+      stop("K must be a single integer.")
+    }
+  }
+  if (!(arrange %in% c(TRUE, FALSE, "horizontal", "vertical", "both"))) {
+    stop("arrange must be TRUE, FALSE, horizontal, vertical, or both.")
+  }
+
   relab_checker_out <- relab_checker(relab = relab_matrix, K = K, group = group, time = time)
 
   K <- ncol(relab_checker_out$relab_matrix)
@@ -193,7 +217,7 @@ plot_signature_prop <- function(relab_matrix, group = NULL, time = NULL, w = NUL
 
 
   # Generate the data to plot
-  relab_plot <- dplyr::mutate(relab_edited, ID = 1:nrow(relab_edited), .before = 1)
+  relab_plot <- dplyr::mutate(relab_edited, ID = seq_len(nrow(relab_edited)), .before = 1)
 
 
   start <- 2 + (!is.null(group)) + (!is.null(time))
@@ -307,6 +331,29 @@ plot_dots <- function(sig_activity, group = colnames(sig_activity)[1],
   # Satisfy R cmd check
   Signature <- . <- Mean_activity <- Proportion_present <- NULL
 
+  if (!(is.character(group))) {
+    stop("group must be a character string or vector of strings specifying the name(s) of the grouping column.")
+  }
+  if (!(is.numeric(K) && length(K) == 1 && (round(K) == K))) {
+    stop("K must be a single integer.")
+  }
+  if (!(is.numeric(max_dotsize) && length(max_dotsize) == 1)) {
+    stop("max_dotsize must be a number.")
+  }
+  if (!(pivot %in% c(TRUE, FALSE))) {
+    stop("pivot must be TRUE or FALSE.")
+  }
+  if (!(median %in% c(TRUE, FALSE))) {
+    stop("median must be TRUE or FALSE.")
+  }
+  if (!(normalized %in% c(TRUE, FALSE))) {
+    stop("normalized must be TRUE or FALSE.")
+  }
+  if (!missing(facet)) {
+    if (!(is.character(facet) && (length(facet) == 1))) {
+      stop("facet must be a character string specifying the name of the faceting column.")
+    }
+  }
 
   # If multiple groups are provided, make a new grouping column
   multiple_groups <- FALSE
@@ -327,17 +374,10 @@ plot_dots <- function(sig_activity, group = colnames(sig_activity)[1],
   facets_few <- ifelse(facet_true, length(unique(unlist(sig_activity[facet]))) <= 4, FALSE)
 
   if (length(K) > 0) {
-    if (K > (ncol(sig_activity) - 1)) warning(paste0("K too large, not enough columns in K; K reduced to ncol(sig_activity)-1=", ncol(sig_activity) - 1))
+    if (K > (ncol(sig_activity) - 1)) warning("K too large, not enough columns in K; K reduced to ncol(sig_activity)-1=", ncol(sig_activity) - 1)
   }
 
   signatures <- colnames(sig_activity)[(ncol(sig_activity) - K + 1):ncol(sig_activity)]
-
-  #  if(facet_true){
-  #   signatures = colnames(sig_activity)[colnames(sig_activity)!=group & colnames(sig_activity)!=facet ][1:min(K,ncol(sig_activity)-1)]
-  # }else{
-  #   signatures = colnames(sig_activity)[colnames(sig_activity)!=group][1:min(K,ncol(sig_activity)-1)]
-  # }
-
 
   if (facet_true) {
     sig_activity_sigs <- cbind(
@@ -444,7 +484,6 @@ plot_dots <- function(sig_activity, group = colnames(sig_activity)[1],
         title.position = "top",
         direction = "horizontal"
       ),
-      # max_size = max_dotsize,
       limits = c(threshold, 1), range = c(-1, max_dotsize),
       breaks = c(0.5, 1),
       name = "Proportion of\ntumors with\nsignature"
@@ -500,23 +539,13 @@ plot_dots <- function(sig_activity, group = colnames(sig_activity)[1],
       }
     } +
     ggplot2::theme_bw() +
-    # ggplot2::guides(color = ggplot2::guide_colourbar(barheight = 3)) +
-    # {if(!pivot)ggplot2::guides(color = ggplot2::guide_colourbar(barheight = 3))}  +
-
     {
       if (pivot) ggplot2::coord_flip()
     } +
-    # {if(pivot)
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    # }+
-
-    # {if(pivot & !facet_true)ggplot2::theme(legend.position = "top")}+
-    # {if(pivot & !facet_true)ggplot2::guides(color = ggplot2::guide_colourbar(barwidth = 3))}+
-    # {if(pivot & facet_true)ggplot2::guides(color = ggplot2::guide_colourbar(barheight = 3))}+
-
     {
       if (facet_true & pivot & facets_few) ggforce::facet_col(dplyr::vars(facet), scales = "free_y", space = "free")
-    } + # This used to have ncol = 1 when it was facet_wrap
+    } +
     {
       if (facet_true & pivot & !facets_few) ggplot2::facet_grid(. ~ facet, scales = "free_y", space = "free_y")
     } +
@@ -541,6 +570,7 @@ plot_dots <- function(sig_activity, group = colnames(sig_activity)[1],
 #' @param SBS_table A matrix with rows corresponding to the 96 single-base substitutions and columns corresponding to distinct mutational spectra you wish to plot.
 #' @return A ggplot2 bar chart depicting SBS mutational spectra
 #' @examples
+#' data(COSMIC3.3.1_SBS, package = "sigvar")
 #' SBS_table <- dplyr::select(COSMIC3.3.1_SBS, SBS1, SBS5)
 #' plot_SBS_spectrum(SBS_table)
 #'
@@ -556,6 +586,11 @@ plot_SBS_spectrum <- function(SBS_table) {
 
   # CHECKS ON SBS_table ------------------------------------------------------
 
+  # is SBS_table a table?
+  if (!(is.matrix(SBS_table) | is.data.frame(SBS_table) | dplyr::is.tbl(SBS_table))) {
+    stop("SBS_table must be a matrix, data frame, or tibble.")
+  }
+
   # does SBS_table have 96 rows?
   if (nrow(SBS_table) != 96) {
     stop("SBS_table must have exactly 96 rows, one for each single-base substitution.")
@@ -567,11 +602,11 @@ plot_SBS_spectrum <- function(SBS_table) {
   SBS_table <- dplyr::select_if(SBS_table, is.numeric)
 
   if (col_count != ncol(SBS_table)) {
-    warning(paste0(
+    warning(
       "The ",
       col_count - ncol(SBS_table),
       " column(s) containing non-numeric values were omitted."
-    ))
+    )
   }
 
   # does SBS_table have only columns that sum to 1?
@@ -581,8 +616,14 @@ plot_SBS_spectrum <- function(SBS_table) {
     warning("At least one column did not sum to 1. The columns have each been divided by their sum so that they now sum to 1.")
   }
 
+  # Create a temporary environment to safely load the data
+  tmp_env <- new.env()
+  utils::data("COSMIC3.3.1_SBS", package = "sigvar", envir = tmp_env)
 
-  sbs <- sigvar::COSMIC3.3.1_SBS %>%
+  # Assign to a standard variable name
+  COSMIC3.3.1_SBS <- tmp_env$COSMIC3.3.1_SBS
+
+  sbs <- COSMIC3.3.1_SBS %>%
     dplyr::select(Type)
   sbs$Sub <- stringr::str_split(sbs$Type, "\\[|\\]", simplify = TRUE)[, 2]
 
@@ -610,27 +651,35 @@ plot_SBS_spectrum <- function(SBS_table) {
     text_x = ggh4x::elem_list_text(color = c("black", "white", "white", rep("black", 3)))
   )
 
+  # plot_data_wide <- cbind(sbs, SBS_table) %>%
+  #   dplyr::mutate(name = glue::glue("<b style='color:#BEBEBE'>{stringr::str_sub(Context, 1,1)}<b style='color:{color}'>{stringr::str_sub(Context, 2, 2)}<b style='color:#BEBEBE'>{stringr::str_sub(Context, 3,3)}"), .before = 5)
+
   plot_data_wide <- cbind(sbs, SBS_table) %>%
-    dplyr::mutate(name = glue::glue("<b style='color:#BEBEBE'>{stringr::str_sub(Context, 1,1)}<b style='color:{color}'>{stringr::str_sub(Context, 2, 2)}<b style='color:#BEBEBE'>{stringr::str_sub(Context, 3,3)}"), .before = 5)
+    dplyr::mutate(
+      name = glue::glue(
+        "<span style='color:#BEBEBE'>{stringr::str_sub(Context, 1, 1)}</span>",
+        "<span style='color:{color}; font-weight:bold'>{stringr::str_sub(Context, 2, 2)}</span>",
+        "<span style='color:#BEBEBE'>{stringr::str_sub(Context, 3, 3)}</span>"
+      ),
+      .before = 5
+    )
 
   plot_data_long <- tidyr::pivot_longer(plot_data_wide,
     cols = colnames(SBS_table),
     names_to = "Spectrum", values_to = "Relative_abundance"
   )
 
-  ggplot2::ggplot(plot_data_long, ggplot2::aes(x = name, y = Relative_abundance, fill = Sub)) +
+  ggplot2::ggplot(
+    plot_data_long,
+    ggplot2::aes(x = name, y = Relative_abundance, fill = Sub)
+  ) +
     ggplot2::geom_bar(stat = "identity") +
     ggh4x::facet_grid2(Spectrum ~ Sub, strip = strip, scales = "free") +
-    ggplot2::theme_minimal() +
-    # scale_x_discrete(expand = c(0, 0))+
-    # scale_y_continuous(expand = c(0, 0)) +
-    ggplot2::theme( # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0,
-      # size = 6, family = "mono"),
+    ggplot2::theme(
       axis.text.x = ggtext::element_markdown(
         angle = 90, vjust = 0.5, hjust = 0, size = 4,
         family = "mono", margin = ggplot2::margin(0)
       ),
-      # axis.title.y = ggplot2::element_blank(),
       axis.title.x = ggplot2::element_blank(),
       strip.text.x = ggplot2::element_text(size = 8),
       strip.text.y = ggplot2::element_text(size = 12),
