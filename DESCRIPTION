@@ -1,6 +1,6 @@
 Package: sigvar
 Title: Quantify and visualize variability of mutational signatures within and across samples
-Version: 0.99.8
+Version: 1.0.0
 Authors@R: c(
     person(
         "Maike", "Morrison",
